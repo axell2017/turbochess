@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TurboChess v0.2 Prototype</title>
+  <title>TurboChess v0.3 — Upgrade Picker + AI vs AI</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -15,64 +15,47 @@
     :root { --bg:#0a0f1a; --fg:#cfe8ff; --cyan:#48e1ff; --mag:#ff5ad6; --gold:#ffde6b; --green:#5bff95; --amber:#ffb35c; --blue:#77b5ff; }
     html, body, #root { height: 100%; margin: 0; background: radial-gradient(1200px 800px at 50% 10%, #0e1630, #070b14 70%, #05060a); color: var(--fg); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
 
-    /* Holographic board look */
     .glass { backdrop-filter: blur(6px) saturate(120%); background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 10px 40px rgba(0,0,0,0.5), inset 0 0 60px rgba(255,255,255,0.04); }
     .neon { text-shadow: 0 0 10px rgba(72,225,255,0.7); }
     .midlineGlow { box-shadow: inset 0 0 25px rgba(72,225,255,0.5); }
 
-    /* Board grid */
     .board { position: relative; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); aspect-ratio: 1/1; }
     .cell { position: relative; display:flex; align-items:center; justify-content:center; font-weight:600; }
     .light { background: rgba(255,255,255,0.06); }
     .dark { background: rgba(0,0,0,0.25); }
     .sqLabel { position:absolute; left:6px; bottom:4px; opacity:0.35; font-size:10px; }
 
-    /* R:C HUD pills */
     .hud { position:absolute; top:6px; right:6px; font-size:10px; padding:2px 6px; border-radius:999px; background: rgba(10, 180, 255, 0.12); border:1px solid rgba(72,225,255,0.45); color:#bfefff; text-shadow:0 0 8px rgba(72,225,255,0.6); }
 
-    /* Pieces (simple glyphs) */
     .piece { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:28px; filter: drop-shadow(0 6px 18px rgba(0,0,0,0.6)); }
     .w { color:#e6f6ff; text-shadow:0 0 6px rgba(72,225,255,0.7); }
     .b { color:#ffd6f3; text-shadow:0 0 6px rgba(255,90,214,0.7); }
 
-    /* Selection/move highlighting */
     .sel { outline: 2px solid rgba(72,225,255,0.9); box-shadow: inset 0 0 20px rgba(72,225,255,0.55); }
     .moveDot { width:14px; height:14px; border-radius:999px; background: radial-gradient(circle at 30% 30%, rgba(72,225,255,0.9), rgba(72,225,255,0.1)); box-shadow:0 0 14px rgba(72,225,255,0.8); }
 
-    /* Upgrade flash */
     @keyframes morphFlash { 0% { opacity:0; transform:scale(0.8);} 40%{opacity:1; transform:scale(1.15);} 100% { opacity:0; transform:scale(1);} }
     .flash { pointer-events:none; position:absolute; inset:8px; border-radius:8px; background: radial-gradient(circle, rgba(72,225,255,0.6), rgba(255,255,255,0.05) 60%, rgba(0,0,0,0) 70%); animation: morphFlash 450ms ease-out; }
 
-    /* Center orbit rings (C:1..3) */
-    .ring { position:absolute; width:70%; height:70%; border-radius:999px; border:1px dashed rgba(72,225,255,0.5); animation: spin 6s linear infinite; }
-    .ring.r2 { width:56%; height:56%; animation-duration:4.5s; }
-    .ring.r3 { width:42%; height:42%; animation-duration:3s; }
-    @keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
-
-    /* Rest halo pips (R:1..6) */
-    .pips { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
-    .pip { width:6px; height:6px; margin:2px; border-radius:999px; background: rgba(72,225,255,0.7); box-shadow:0 0 10px rgba(72,225,255,0.8); opacity:0.6; }
-
-    /* Seasons overlay */
+    /* Seasons overlay (future optional effects) */
     .seasons { pointer-events:none; position:absolute; inset:0; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; mix-blend-mode:screen; }
     .season { opacity:0.16; }
-    .spring { background: radial-gradient(60% 60% at 30% 30%, rgba(91,255,149,0.4), rgba(0,0,0,0)); }
-    .summer { background: radial-gradient(60% 60% at 70% 30%, rgba(255,222,107,0.4), rgba(0,0,0,0)); }
-    .autumn { background: radial-gradient(60% 60% at 30% 70%, rgba(255,179,92,0.4), rgba(0,0,0,0)); }
-    .winter { background: radial-gradient(60% 60% at 70% 70%, rgba(119,181,255,0.4), rgba(0,0,0,0)); }
 
-    /* Hexagram hint layer */
     .hexLayer { position:absolute; inset:0; display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(8, 1fr); pointer-events:none; }
     .hexCell { display:flex; align-items:center; justify-content:center; opacity:0.12; font-size:10px; }
 
     a, button { outline:none; }
+
+    .modalOverlay { position:fixed; inset:0; background: rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:50; }
+    .modal { width: 340px; border-radius: 12px; padding: 16px; }
+    .pickerBtn { min-width:56px; height:42px; border-radius:10px; font-weight:700; }
   </style>
 </head>
 <body>
   <div id="root"></div>
 
   <script type="text/babel">
-    // TurboChess v0.2 core (minimal playable + timers + upgrades)
+    // TurboChess v0.3 — Upgrade Picker + AI vs AI
 
     const FILES = ['a','b','c','d','e','f','g','h'];
     const RANKS = ['8','7','6','5','4','3','2','1'];
@@ -80,10 +63,10 @@
 
     const initialPieces = () => {
       const pieces = [];
-      // Pawns
+      // Pawns with tick counter
       for (let f=0; f<8; f++) {
-        pieces.push({ t:'P', c:'w', sq: IDX(f,6), rest:0, center:0, id:`wP${f}` , hasMoved:false});
-        pieces.push({ t:'P', c:'b', sq: IDX(f,1), rest:0, center:0, id:`bP${f}` , hasMoved:false});
+        pieces.push({ t:'P', c:'w', sq: IDX(f,6), tick:0, id:`wP${f}` , hasMoved:false});
+        pieces.push({ t:'P', c:'b', sq: IDX(f,1), tick:0, id:`bP${f}` , hasMoved:false});
       }
       // Back ranks
       const back = ['R','N','B','Q','K','B','N','R'];
@@ -95,14 +78,9 @@
     };
 
     function cloneState(s){ return JSON.parse(JSON.stringify(s)); }
-
     function sqToFR(sq){ return [sq%8, Math.floor(sq/8)]; }
     function FRToSq(f,r){ return r*8+f; }
-    function sqName(sq){ const [f,r]=sqToFR(sq); return FILES[f]+RANKS[7-r]; }
-
-    function boundaryRank(color){ return color==='w' ? 4 : 3; /* 0-indexed rows: white boundary is r=4 (rank 4), black boundary r=3 (rank 5) */ }
-    function onBoundary(piece){ const [,r]=sqToFR(piece.sq); return r===boundaryRank(piece.c); }
-    function beyondBoundary(color, r){ return color==='w' ? r < boundaryRank(color) : r > boundaryRank(color); }
+    function isMidStripSq(sq){ const [,r]=sqToFR(sq); return r===3 || r===4; }
 
     function makeInitialState(){
       return {
@@ -111,45 +89,56 @@
         ep: null, // en passant target square index
         ply: 0,
         morphFlashSq: null,
+        // v0.3 picker flow
+        upgradeQueue: [],
+        awaitingUpgrade: null, // { pawnId, choices: ['N','B','R','Q'] }
       };
     }
 
     function pieceAt(state, sq){ return state.pieces.find(p=>p.sq===sq); }
     function inBoard(f,r){ return f>=0 && f<8 && r>=0 && r<8; }
-
     function isEmpty(state, sq){ return !pieceAt(state, sq); }
 
+    // New thresholds
+    function upgradeChoicesForPawn(p){
+      const t = p.tick || 0;
+      const onStrip = isMidStripSq(p.sq);
+      const set = new Set();
+      if (t >= 6) { set.add('N'); set.add('B'); set.add('R'); }
+      if (t >= 9) { set.add('Q'); }
+      if (onStrip && t >= 3) { set.add('N'); set.add('B'); set.add('R'); set.add('Q'); }
+      return Array.from(set);
+    }
+
     function generateMoves(state){
-      // Pseudo-legal moves inc. waits. No full check legality for v0.2.
+      // Pseudo-legal moves (no check detection yet).
       const moves = [];
       const dir = { w: -1, b: 1 };
-      const their = state.stm==='w' ? 'b' : 'w';
-      const boundaryRow = boundaryRank(state.stm);
 
       for (const p of state.pieces) {
         if (p.c !== state.stm) continue;
+
         if (p.t === 'P') {
           const [f,r] = sqToFR(p.sq);
 
-
-          // Forward 1 if not beyond boundary and empty
+          // Forward 1
           const r1 = r + dir[p.c];
-          if (inBoard(f,r1) && !beyondBoundary(p.c, r1) && isEmpty(state, FRToSq(f,r1))) {
+          if (inBoard(f,r1) && isEmpty(state, FRToSq(f,r1))) {
             moves.push({ kind:'move', from:p.sq, to: FRToSq(f,r1) });
 
-            // Double on first move to boundary if clear
+            // Forward 2 on first move if clear
             if (!p.hasMoved) {
               const r2 = r + 2*dir[p.c];
-              if (inBoard(f,r2) && r2===boundaryRank(p.c) && isEmpty(state, FRToSq(f,r2)) && isEmpty(state, FRToSq(f,r1))) {
+              if (inBoard(f,r2) && isEmpty(state, FRToSq(f,r2)) && isEmpty(state, FRToSq(f,r1))) {
                 moves.push({ kind:'move', from:p.sq, to: FRToSq(f,r2), double:true });
               }
             }
           }
 
-          // Diagonal captures within/onto boundary only
+          // Diagonal captures
           for (const df of [-1, +1]){
             const f2 = f+df, r2 = r + dir[p.c];
-            if (!inBoard(f2,r2) || beyondBoundary(p.c, r2)) continue;
+            if (!inBoard(f2,r2)) continue;
             const sq = FRToSq(f2,r2);
             const victim = pieceAt(state, sq);
             if (victim && victim.c !== p.c) {
@@ -157,13 +146,12 @@
             }
           }
 
-          // En passant gating by landing square not beyond boundary
+          // En passant (standard)
           if (state.ep != null) {
-            // ep square is the capture landing square
             const [ef, er] = sqToFR(state.ep);
-            if (er === r + dir[p.c] && Math.abs(ef - f) === 1 && !beyondBoundary(p.c, er)){
-              // Ensure adjacent enemy pawn moved double last turn lands adjacent
-              const adjSq = FRToSq(ef, r);
+            const [pf, pr] = sqToFR(p.sq);
+            if (er === pr + dir[p.c] && Math.abs(ef - pf) === 1){
+              const adjSq = FRToSq(ef, pr);
               const adj = pieceAt(state, adjSq);
               if (adj && adj.t==='P' && adj.c!==p.c) {
                 moves.push({ kind:'move', from:p.sq, to: state.ep, capture:true, enPassant:true, capSq: adjSq });
@@ -197,7 +185,7 @@
           for (let df=-1; df<=1; df++) for (let dr=-1; dr<=1; dr++){
             if (df===0 && dr===0) continue; const f2=f+df, r2=r+dr; if (!inBoard(f2,r2)) continue; const sq=FRToSq(f2,r2); const q=pieceAt(state,sq); if (q && q.c===p.c) continue; moves.push({kind:'move', from:p.sq, to:sq, capture:!!q});
           }
-          // No castling logic in v0.2 to keep it simple
+          // No castling logic in v0.3
         }
       }
       return moves;
@@ -205,201 +193,263 @@
 
     function applyMove(state, mv){
       const s = cloneState(state);
-      const their = s.stm==='w' ? 'b' : 'w';
       s.morphFlashSq = null;
 
-      // Increment wait counters if mv.kind==='wait', else handle resets
-      if (mv.kind === 'wait'){
-        // Find the pawn and increment the appropriate clock
-        const p = s.pieces.find(x=>x.id===mv.pieceId);
-        if (p && p.t==='P'){
-          if (onBoundary(p)) { p.center = Math.min(3, (p.center||0) + 1); }
-          else { p.rest = Math.min(6, (p.rest||0) + 1); }
-        }
-      } else if (mv.kind === 'move'){
-        // Move piece, handle capture and en passant
-        const mover = s.pieces.find(x=>x.sq===mv.from);
-        if (!mover) return state;
-        // Captures
-        if (mv.capture){
-          if (mv.enPassant){
-            // remove adjacent pawn at capSq
-            s.pieces = s.pieces.filter(x=>x.sq!==mv.capSq);
-          } else {
-            s.pieces = s.pieces.filter(x=>x.sq!==mv.to);
-          }
-        }
-        mover.sq = mv.to;
-        if (mover.t==='P'){
-          mover.hasMoved = true;
-          // reset rest
-          mover.rest = 0;
-          // center resets unless ending on boundary
-          if (onBoundary(mover)){
-            // Keep center as-is when landing on boundary? Per spec: leaving boundary or capturing resets center; ending on boundary keeps progress.
-            // If we moved from off-boundary to boundary, center remains whatever it was (likely 0). No increment on move.
-          } else {
-            mover.center = 0;
-          }
-        }
-        // Set en passant target if a pawn moved double
-        if (mover.t==='P' && mv.double){
-          const [f, rFrom] = sqToFR(mv.from);
-          const [_, rTo] = sqToFR(mv.to);
-          const midR = (rFrom + rTo)/2; // integer
-          s.ep = FRToSq(f, midR);
+      if (mv.kind !== 'move') return state; // only moves end turns now
+
+      const mover = s.pieces.find(x=>x.sq===mv.from);
+      if (!mover) return state;
+
+      // Handle capture
+      if (mv.capture){
+        if (mv.enPassant){
+          s.pieces = s.pieces.filter(x=>x.sq!==mv.capSq);
         } else {
-          s.ep = null;
+          s.pieces = s.pieces.filter(x=>x.sq!==mv.to);
         }
       }
 
-      // After move/wait, switch side
+      // Move piece
+      mover.sq = mv.to;
+      if (mover.t==='P'){
+        mover.hasMoved = true;
+      }
+
+      // Set/clear en passant
+      if (mover.t==='P' && mv.double){
+        const [f, rFrom] = sqToFR(mv.from);
+        const [_, rTo] = sqToFR(mv.to);
+        const midR = (rFrom + rTo)/2;
+        s.ep = FRToSq(f, midR);
+      } else {
+        s.ep = null;
+      }
+
+      // End-of-turn ticks: all pawns of mover's color +1, except the pawn that moved resets to 0
+      const side = mover.c;
+      for (const p of s.pieces){
+        if (p.t==='P' && p.c===side){
+          if (p === mover){
+            p.tick = 0; // the pawn that moved resets
+          } else {
+            p.tick = Math.min(9, (p.tick||0) + 1);
+          }
+        }
+      }
+
+      // Switch side
       s.stm = s.stm==='w' ? 'b' : 'w';
       s.ply += 1;
 
-      // Start-of-turn metamorphosis for new side to move
-      const upState = resolveUpgrades(s);
-      upState.morphFlashSq = s.morphFlashSq; // carry through
-      return upState;
+      // Start-of-turn upgrades for new side to move (queue + picker)
+      return beginUpgradeFlow(s);
     }
 
-    function resolveUpgrades(state){
+    function beginUpgradeFlow(state){
       const s = cloneState(state);
-      // Find pawns of side to move that qualify (center=3 on boundary OR rest=6 anywhere)
-      const upgrades = s.pieces.filter(p=> p.t==='P' && p.c===s.stm && ((onBoundary(p) && p.center===3) || p.rest===6));
-      if (upgrades.length===0) return s;
+      s.morphFlashSq = null;
+      s.upgradeQueue = [];
+      s.awaitingUpgrade = null;
 
-      // For simplicity in v0.2, auto-upgrade to Queen; UI will let user pick.
-      for (const p of upgrades){
-        // Transform in place
-        p.t = 'Q';
-        delete p.id; delete p.hasMoved; delete p.center; delete p.rest;
-        s.morphFlashSq = p.sq;
+      // Collect eligible pawns for the side to move
+      const pawns = s.pieces.filter(p=> p.t==='P' && p.c===s.stm);
+      for (const p of pawns){
+        const choices = upgradeChoicesForPawn(p);
+        if (choices.length>0){
+          s.upgradeQueue.push({ pawnSq: p.sq, choices });
+        }
+      }
+
+      if (s.upgradeQueue.length>0){
+        const next = s.upgradeQueue.shift();
+        s.awaitingUpgrade = next;
       }
       return s;
     }
 
-    // Simple evaluation + AI (depth-1 greedy)
-    function evalState(state){
+    function applyUpgradeChoice(state, choice){
+      const s = cloneState(state);
+      const pending = s.awaitingUpgrade;
+      if (!pending) return s;
+      const p = s.pieces.find(x=> x.t==='P' && x.sq===pending.pawnSq && x.c===s.stm);
+      if (!p) { s.awaitingUpgrade = null; return s; }
+      // Transform
+      p.t = choice; // 'N','B','R','Q'
+      delete p.id; delete p.hasMoved; delete p.tick;
+      s.morphFlashSq = p.sq;
+
+      // Queue next if any
+      if (s.upgradeQueue.length>0){
+        s.awaitingUpgrade = s.upgradeQueue.shift();
+      } else {
+        s.awaitingUpgrade = null;
+      }
+      return s;
+    }
+
+    // Medium AI: shallow lookahead + reward imminent metamorph
+    function evalState(state, persp){
       const vals = {Q:900,R:500,B:330,N:320,P:100};
-      let score = 0; // from stm perspective
+      let score = 0;
       for (const p of state.pieces){
-        if (p.t!=='K') score += (p.c===state.stm?1:-1) * (vals[p.t]||0);
+        const sgn = (p.c===persp)? 1 : -1;
+        if (p.t!=='K') score += sgn * (vals[p.t]||0);
         if (p.t==='P'){
-          if (onBoundary(p)) score += (p.c===state.stm?1:-1)*40;
-          if (p.center>=1) score += (p.c===state.stm?1:-1) * [0,120,250,450][p.center];
-          if (p.rest>=3) score += (p.c===state.stm?1:-1) * [0,0,0,70,120,220,400][p.rest];
+          const t = p.tick||0;
+          // Bonuses around thresholds
+          // Off-strip: 6 for minor, 9 for queen; On-strip: 3 for both
+          const onStrip = isMidStripSq(p.sq);
+          const minThr = onStrip ? 3 : 6;
+          const qThr = onStrip ? 3 : 9;
+          if (t >= qThr) score += sgn * 430; // imminent queen potential
+          else if (t === qThr-1) score += sgn * 200;
+          if (t >= minThr) score += sgn * 160; // minor potential
+          else if (t === minThr-1) score += sgn * 90;
+          if (onStrip) score += sgn * 35;
         }
       }
-      // Small mobility proxy: count moves for stm minus opp
-      const stmMoves = generateMoves(state).length;
-      const s2 = cloneState(state); s2.stm = s2.stm==='w'?'b':'w';
-      const oppMoves = generateMoves(s2).length;
-      score += (stmMoves - oppMoves) * 1.5;
+      // Mobility proxy
+      const s1 = cloneState(state); s1.stm = persp; s1.awaitingUpgrade=null; s1.upgradeQueue=[];
+      const s2 = cloneState(state); s2.stm = (persp==='w'?'b':'w'); s2.awaitingUpgrade=null; s2.upgradeQueue=[];
+      score += (generateMoves(s1).length - generateMoves(s2).length) * 1.2;
       return score;
     }
 
     function aiPickMove(state){
-      // Resolve any start-of-turn upgrades automatically first (already done in state provided to AI)
-      const moves = generateMoves(state);
-      if (moves.length===0) return null;
-      let best= null, bestScore = -1e9;
-      for (const mv of moves){
-        const s2 = applyMove(state, mv);
-        const sc = evalState(s2) + Math.random()*1e-3;
-        if (sc>bestScore){ bestScore=sc; best=mv; }
+      // If upgrade choice is pending for AI, auto-pick best by value
+      if (state.awaitingUpgrade){
+        const choices = state.awaitingUpgrade.choices;
+        const order = ['Q','R','B','N'];
+        const pick = choices.includes('Q') ? 'Q' : (choices.includes('R')?'R':(choices.includes('B')?'B':'N'));
+        return { kind:'upgrade', choice: pick };
+      }
+
+      const persp = state.stm;
+      const myMoves = generateMoves(state);
+      if (myMoves.length===0) return null;
+
+      // Order: prioritize captures (simple)
+      myMoves.sort((a,b)=> (b.capture?1:0)-(a.capture?1:0));
+
+      let best=null, bestScore=-1e9;
+      for (const mv of myMoves){
+        const sAfter = applyMove(state, mv);
+        // If opponent has pending upgrades, simulate auto-best choices for them too
+        let sSim = sAfter;
+        while (sSim.awaitingUpgrade){
+          const c = aiPickMove(sSim); // returns upgrade kind
+          if (!c || c.kind!=='upgrade') break;
+          sSim = applyUpgradeChoice(sSim, c.choice);
+        }
+
+        // Opp reply (min)
+        const oppMoves = generateMoves(sSim);
+        let worst = +1e9;
+        if (oppMoves.length===0){
+          worst = evalState(sSim, persp);
+        } else {
+          for (const omv of oppMoves){
+            let sReply = applyMove(sSim, omv);
+            // Resolve their upgrades too
+            while (sReply.awaitingUpgrade){
+              const c2 = aiPickMove(sReply);
+              if (!c2 || c2.kind!=='upgrade') break;
+              sReply = applyUpgradeChoice(sReply, c2.choice);
+            }
+            const sc = evalState(sReply, persp);
+            if (sc < worst) worst = sc;
+          }
+        }
+        // Small immediate bias for captures
+        const finalScore = worst + (mv.capture? 80 : 0);
+        if (finalScore > bestScore){ bestScore=finalScore; best=mv; }
       }
       return best;
     }
 
     // UI
-    function useQuery(){
-      const params = new URLSearchParams(window.location.search);
-      return {
-        mode: params.get('mode')||'human-ai', // 'human-human' | 'human-ai' | 'ai-ai'
-        speed: params.get('speed')||'normal', // 'normal' | 'fast' | 'instant'
-        hud: (params.get('hud')||'on')==='on'
-      };
-    }
-
     function App(){
-      const query = useQuery();
-      const [state, setState] = React.useState(()=>{
-        const s = makeInitialState();
-        // Start-of-game: resolve white start upgrades (none) and return
-        return resolveUpgrades(s);
-      });
+      const [mode, setMode] = React.useState('human-ai'); // 'human-human' | 'human-ai' | 'ai-human' | 'ai-ai'
+      const [speed, setSpeed] = React.useState('normal'); // 'instant' | 'fast' | 'normal'
+      const [state, setState] = React.useState(()=> beginUpgradeFlow(makeInitialState()));
       const [selected, setSelected] = React.useState(null);
       const [moves, setMoves] = React.useState([]);
       const [flashSq, setFlashSq] = React.useState(null);
-      const [running, setRunning] = React.useState(query.mode==='ai-ai');
+      const [running, setRunning] = React.useState(false);
 
       const sideToHuman = React.useMemo(()=>{
-        if (query.mode==='human-human') return {w:true, b:true};
-        if (query.mode==='human-ai') return {w:true, b:false};
-        if (query.mode==='ai-human') return {w:false, b:true};
-        if (query.mode==='ai-ai') return {w:false, b:false};
-        return {w:true, b:false};
-      }, [query.mode]);
+        return {
+          w: mode==='human-human' || mode==='human-ai',
+          b: mode==='human-human' || mode==='ai-human',
+        };
+      }, [mode]);
 
-      const speedMs = query.speed==='instant' ? 0 : (query.speed==='fast' ? 250 : 600);
+      const speedMs = speed==='instant' ? 0 : (speed==='fast' ? 250 : 600);
 
-      // AI loop
+      // AI loop (handle upgrade choices and moves)
       React.useEffect(()=>{
         if (!running) return;
-        if (sideToHuman[state.stm]) return; // wait for human
+        // Pause on picker regardless of side
+        if (state.awaitingUpgrade) return;
+        // If it's a human side, wait for click
+        if (sideToHuman[state.stm]) return;
+
         const id = setTimeout(()=>{
-          const mv = aiPickMove(state);
-          if (!mv){ setRunning(false); return; }
-          const s2 = applyMove(state, mv);
-          if (s2.morphFlashSq!=null){ setFlashSq(s2.morphFlashSq); setTimeout(()=>setFlashSq(null), 480); }
-          setState(s2);
+          const next = aiPickMove(state);
+          if (!next){ setRunning(false); return; }
+          if (next.kind==='upgrade'){
+            const s2 = applyUpgradeChoice(state, next.choice);
+            if (s2.morphFlashSq!=null){ setFlashSq(s2.morphFlashSq); setTimeout(()=>setFlashSq(null), 480); }
+            setState(s2);
+          } else {
+            const s2 = applyMove(state, next);
+            if (s2.morphFlashSq!=null){ setFlashSq(s2.morphFlashSq); setTimeout(()=>setFlashSq(null), 480); }
+            setState(s2);
+          }
         }, speedMs);
         return ()=>clearTimeout(id);
       }, [running, state, sideToHuman, speedMs]);
 
       function onCellClick(sq){
+        if (state.awaitingUpgrade) return; // must resolve picker first
         if (!sideToHuman[state.stm]) return;
         const p = pieceAt(state, sq);
         if (selected==null){
           if (p && p.c===state.stm){
             setSelected(sq);
-            // Show moves from this square + wait if pawn
-            const ms = generateMoves(state).filter(m=>m.from===sq || (m.kind==='wait' && p.t==='P'));
+            const ms = generateMoves(state).filter(m=>m.from===sq);
             setMoves(ms);
           }
           return;
         }
-        // If clicking same square and pawn, interpret as wait
-        if (selected===sq){
-          const pi = pieceAt(state, sq);
-          if (pi && pi.t==='P'){
-            const mv = {kind:'wait', from:sq, pieceId: pi.id};
-            const s2 = applyMove(state, mv);
-            if (s2.morphFlashSq!=null){ setFlashSq(s2.morphFlashSq); setTimeout(()=>setFlashSq(null), 480); }
-            setState(s2); setSelected(null); setMoves([]);
-            return;
-          }
-        }
-        // Try to find a move to this square
-        const cand = moves.find(m=>m.to===sq || m.kind==='wait');
+        if (selected===sq){ setSelected(null); setMoves([]); return; }
+        const cand = moves.find(m=>m.to===sq);
         if (cand){
           const s2 = applyMove(state, cand);
           if (s2.morphFlashSq!=null){ setFlashSq(s2.morphFlashSq); setTimeout(()=>setFlashSq(null), 480); }
           setState(s2); setSelected(null); setMoves([]);
         } else {
-          // reselect
           setSelected(null); setMoves([]);
           const p2 = pieceAt(state, sq);
           if (p2 && p2.c===state.stm){
             setSelected(sq);
-            const ms = generateMoves(state).filter(m=>m.from===sq || (m.kind==='wait' && p2.t==='P'));
+            const ms = generateMoves(state).filter(m=>m.from===sq);
             setMoves(ms);
           }
         }
       }
 
-      function reset(){ setState(resolveUpgrades(makeInitialState())); setSelected(null); setMoves([]); setRunning(query.mode==='ai-ai'); }
+      function onPick(choice){
+        const s2 = applyUpgradeChoice(state, choice);
+        if (s2.morphFlashSq!=null){ setFlashSq(s2.morphFlashSq); setTimeout(()=>setFlashSq(null), 480); }
+        setState(s2);
+      }
+
+      function reset(newMode){
+        if (newMode) setMode(newMode);
+        setState(beginUpgradeFlow(makeInitialState()));
+        setSelected(null); setMoves([]); setRunning(false);
+      }
 
       const [boardW, setBoardW] = React.useState(600);
       React.useEffect(()=>{
@@ -420,22 +470,33 @@
         }
       }
 
-      const seasonOn = true; // toggle later via query
+      const seasonOn = true; // visual placeholder; mechanics coming soon
 
       return (
         <div className="w-full h-full flex flex-col items-center">
           <div className="w-full max-w-5xl px-4 pt-6 pb-3 flex items-center justify-between">
-            <div className="text-xl font-extrabold tracking-tight neon">TurboChess v0.2</div>
+            <div className="text-xl font-extrabold tracking-tight neon">TurboChess v0.3 — Upgrade Picker + AI vs AI</div>
             <div className="flex items-center gap-2">
+              <select className="px-2 py-1 rounded-md glass" value={mode} onChange={e=>reset(e.target.value)}>
+                <option value="human-ai">Human (White) vs AI</option>
+                <option value="ai-human">AI vs Human (Black)</option>
+                <option value="human-human">Human vs Human</option>
+                <option value="ai-ai">AI vs AI</option>
+              </select>
+              <select className="px-2 py-1 rounded-md glass" value={speed} onChange={e=>setSpeed(e.target.value)}>
+                <option value="normal">Speed: Normal</option>
+                <option value="fast">Speed: Fast</option>
+                <option value="instant">Speed: Instant</option>
+              </select>
               <button className="px-3 py-1 rounded-md glass hover:bg-white/10" onClick={()=>setRunning(r=>!r)}>{running? 'Pause' : 'Play'}</button>
-              <button className="px-3 py-1 rounded-md glass hover:bg-white/10" onClick={reset}>Reset</button>
+              <button className="px-3 py-1 rounded-md glass hover:bg-white/10" onClick={()=>reset()}>Reset</button>
             </div>
           </div>
 
           <div className="relative" style={{width: boardW, aspectRatio:'1/1'}}>
             <div className="board glass rounded-lg overflow-hidden" style={{width: '100%', height: '100%'}}>
               {grid.map((sq)=>{
-                const [f,r]=sqToFR(sq);
+                const f = sq % 8; const r = Math.floor(sq/8);
                 const isLight = (f+r)%2===0;
                 const p = pieceAt(state, sq);
                 const midline = (r===3 || r===4);
@@ -443,9 +504,9 @@
                 const ms = moves.filter(m=>m.to===sq && m.kind==='move');
                 return (
                   <div key={sq} className={`cell ${isLight? 'light':'dark'} ${midline? 'midlineGlow' : ''} ${isSel? 'sel':''}`} onClick={()=>onCellClick(sq)}>
-                    <div className="sqLabel">{FILES[f]}{RANKS[7-r]}</div>
+                    <div className="sqLabel">{"abcdefgh"[f]}{"87654321"[r]}</div>
                     {p && <Piece p={p} />}
-                    {query.hud && p && p.t==='P' && <PawnHUD p={p} />}
+                    {p && p.t==='P' && <PawnHUD p={p} />}
                     {ms.length>0 && <div className="moveDot" />}
                     {flashSq===sq && <div className="flash" />}
                   </div>
@@ -453,10 +514,10 @@
               })}
 
               {seasonOn && <div className="seasons">
-                <div className="season spring"></div>
-                <div className="season summer"></div>
-                <div className="season autumn"></div>
-                <div className="season winter"></div>
+                <div className="season" style={{gridArea:'1 / 1 / 2 / 2', background:'radial-gradient(60% 60% at 30% 30%, rgba(91,255,149,0.4), rgba(0,0,0,0))'}}></div>
+                <div className="season" style={{gridArea:'1 / 2 / 2 / 3', background:'radial-gradient(60% 60% at 70% 30%, rgba(255,222,107,0.4), rgba(0,0,0,0))'}}></div>
+                <div className="season" style={{gridArea:'2 / 1 / 3 / 2', background:'radial-gradient(60% 60% at 30% 70%, rgba(255,179,92,0.4), rgba(0,0,0,0))'}}></div>
+                <div className="season" style={{gridArea:'2 / 2 / 3 / 3', background:'radial-gradient(60% 60% at 70% 70%, rgba(119,181,255,0.4), rgba(0,0,0,0))'}}></div>
               </div>}
 
               <HexLayer />
@@ -465,19 +526,37 @@
 
           <div className="w-full max-w-5xl px-4 py-4 text-sm opacity-80">
             <p>
-              Tips: Click a pawn to select; click it again to "Wait" (increments Rest anywhere or Center on the midline). Pawns can't move or capture beyond their boundary (white rank 4, black rank 5). Upgrades trigger at the start of your turn after Center=3 or Rest=6, and the new piece moves immediately that turn. En passant only if the landing square isn't beyond your boundary.
+              New in v0.3: Start-of-turn upgrade picker. Pawns that have accumulated 6 ticks (off-strip) may become N/B/R (no queen). Queens require 9 ticks off-strip, or just 3 ticks on the mid-strip (ranks 4–5). Multiple eligible pawns are queued one-by-one before your move. Toggle AI vs AI to watch them battle.
             </p>
           </div>
+
+          {state.awaitingUpgrade && (
+            <div className="modalOverlay">
+              <div className="modal glass">
+                <div className="text-lg font-bold mb-2">Choose Upgrade</div>
+                <div className="text-xs mb-4 opacity-80">Eligible choices are based on pawn ticks and position (mid-strip allows faster queen).</div>
+                <div className="flex flex-wrap gap-2">
+                  {state.awaitingUpgrade.choices.map(ch => (
+                    <button key={ch} onClick={()=>onPick(ch)} className="pickerBtn glass hover:bg-white/10 px-3">
+                      {ch==='Q'?'♕ Q': ch==='R'?'♖ R': ch==='B'?'♗ B':'♘ N'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     }
 
     function PawnHUD({p}){
-      const c = onBoundary(p) ? (p.center||0) : 0;
-      const r = (p.rest||0);
+      const t = p.tick||0;
+      const onStrip = isMidStripSq(p.sq);
+      const minorThr = onStrip ? 3 : 6;
+      const qThr = onStrip ? 3 : 9;
       return (
         <div className="hud">
-          R:{r} / C:{c}
+          T:{t} / NBR:{minorThr} Q:{qThr}
         </div>
       );
     }
@@ -498,20 +577,6 @@
       return (
         <div className={`piece ${cls}`}>
           <span>{glyph}</span>
-          {/* Center orbit rings */}
-          {p.t==='P' && onBoundary(p) && p.center>0 && (
-            <>
-              <div className="ring r1"></div>
-              {p.center>=2 && <div className="ring r2"></div>}
-              {p.center>=3 && <div className="ring r3"></div>}
-            </>
-          )}
-          {/* Rest halo pips */}
-          {p.t==='P' && !onBoundary(p) && p.rest>0 && (
-            <div className="pips">
-              {[...Array(Math.min(6, p.rest)).keys()].map(i=> <div key={i} className="pip" />)}
-            </div>
-          )}
         </div>
       );
     }
@@ -529,6 +594,7 @@
       );
     }
 
+    // Entry
     ReactDOM.render(<App />, document.getElementById('root'));
   </script>
 </body>
