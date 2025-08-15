@@ -131,8 +131,6 @@
         if (p.t === 'P') {
           const [f,r] = sqToFR(p.sq);
 
-          // WAIT action (always available; counters handled on apply)
-          moves.push({ kind:'wait', from:p.sq, pieceId:p.id });
 
           // Forward 1 if not beyond boundary and empty
           const r1 = r + dir[p.c];
