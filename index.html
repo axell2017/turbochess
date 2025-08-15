@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>TurboChess v0.4.1 — Spring Pulse + I Ching Heatmap</title>
+  <title>TurboChess v0.4.2 — Mid-Strip Rebalance + Multi-King End</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
@@ -60,7 +60,7 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    // v0.4.1: Spring visual pulse wired + I Ching heatmap (per-square action/decay, 3 -> cast)
+    // v0.4.2: Mid-strip rebalance (NBR @3, Q @5) + game ends only when a side has 0 kings
 
     const FILES = ['a','b','c','d','e','f','g','h'];
     const IDX = (f,r) => r*8+f;
@@ -114,12 +114,14 @@
     function inBoard(f,r){ return f>=0 && f<8 && r>=0 && r<8; }
     function isEmpty(state, sq){ return !pieceAt(state, sq); }
 
+    // UPDATED: mid-strip thresholds (NBR @3, Q @5) and off-strip unchanged (NBR @6, Q @8), K @9 anywhere
     function upgradeChoicesForPawn(p){
       const t = p.tick || 0; const onStrip = isMidStripSq(p.sq); const set = new Set();
-      if (t >= 6) { set.add('N'); set.add('B'); set.add('R'); }
-      if (t >= 8) { set.add('Q'); }
+      const minorThr = onStrip ? 3 : 6; // N/B/R
+      const qThr = onStrip ? 5 : 8;     // Queen
+      if (t >= minorThr) { set.add('N'); set.add('B'); set.add('R'); }
+      if (t >= qThr) { set.add('Q'); }
       if (t >= 9) { set.add('K'); }
-      if (onStrip && t >= 3) { set.add('N'); set.add('B'); set.add('R'); set.add('Q'); }
       return Array.from(set);
     }
 
@@ -167,7 +169,10 @@
       const acted = new Set([mv.from, mv.to]); if (mv.enPassant && mv.capSq!=null) acted.add(mv.capSq);
       decayAndApplyHeat(s, acted);
 
-      if (victim && victim.t==='K'){ s.terminal = { result:mover.c, reason:'King captured' }; s.stm = (s.stm==='w'?'b':'w'); s.ply+=1; return s; }
+      // UPDATED END CONDITION: game ends only when a side has no kings remaining
+      const wKings = s.pieces.filter(p=>p.t==='K' && p.c==='w').length;
+      const bKings = s.pieces.filter(p=>p.t==='K' && p.c==='b').length;
+      if (wKings===0 || bKings===0){ s.terminal = { result: wKings>0 ? 'w' : (bKings>0 ? 'b' : 'draw'), reason:'All kings of a side captured' }; s.stm = (s.stm==='w'?'b':'w'); s.ply+=1; return s; }
 
       s.stm = s.stm==='w' ? 'b' : 'w'; s.ply += 1;
       return beginUpgradeFlow(s);
@@ -223,9 +228,9 @@
       state.squareHeat = heat;
     }
 
-    // Simple AI and eval (unchanged from stable, omitted for brevity in this version)
+    // Simple AI and eval (updated thresholds and terminal check)
     function evalState(state, persp){
-      const vals={Q:900,R:500,B:330,N:320,P:100}; let score=0; for (const p of state.pieces){ const sgn=(p.c===persp)?1:-1; if (p.t!=='K') score+=sgn*(vals[p.t]||0); if (p.t==='P'){ const t=p.tick||0; const onStrip=isMidStripSq(p.sq); const minThr=onStrip?3:6; const qThr=onStrip?3:8; if (t>=qThr) score+=sgn*430; else if (t===qThr-1) score+=sgn*200; if (t>=minThr) score+=sgn*160; else if (t===minThr-1) score+=sgn*90; if (onStrip) score+=sgn*35; } } const s1=cloneState(state); s1.stm=persp; s1.awaitingUpgrade=null; s1.upgradeQueue=[]; const s2=cloneState(state); s2.stm=(persp==='w'?'b':'w'); s2.awaitingUpgrade=null; s2.upgradeQueue=[]; score += (generateMoves(s1).length - generateMoves(s2).length) * 1.2; return score; }
+      const vals={Q:900,R:500,B:330,N:320,P:100}; let score=0; for (const p of state.pieces){ const sgn=(p.c===persp)?1:-1; if (p.t!=='K') score+=sgn*(vals[p.t]||0); if (p.t==='P'){ const t=p.tick||0; const onStrip=isMidStripSq(p.sq); const minorThr=onStrip?3:6; const qThr=onStrip?5:8; if (t>=qThr) score+=sgn*430; else if (t===qThr-1) score+=sgn*200; if (t>=minorThr) score+=sgn*160; else if (t===minorThr-1) score+=sgn*90; if (onStrip) score+=sgn*35; } } const s1=cloneState(state); s1.stm=persp; s1.awaitingUpgrade=null; s1.upgradeQueue=[]; const s2=cloneState(state); s2.stm=(persp==='w'?'b':'w'); s2.awaitingUpgrade=null; s2.upgradeQueue=[]; score += (generateMoves(s1).length - generateMoves(s2).length) * 1.2; return score; }
     function aiPickMove(state){ if (state.awaitingUpgrade){ const choices=state.awaitingUpgrade.choices; const order=['Q','R','B','N','K']; const pick=order.find(x=>choices.includes(x))||choices[0]; return {kind:'upgrade', choice:pick}; } const persp=state.stm; const my=generateMoves(state); if (!my.length) return null; my.sort((a,b)=> (b.capture?1:0)-(a.capture?1:0)); let best=null, bestScore=-1e9; for (const mv of my){ const sAfter=applyMove(state, mv); if (sAfter.terminal) return mv; let sSim=sAfter; while (sSim.awaitingUpgrade){ const c=aiPickMove(sSim); if (!c||c.kind!=='upgrade') break; sSim=applyUpgradeChoice(sSim,c.choice); } const opp=generateMoves(sSim); let worst=+1e9; if (!opp.length){ worst=evalState(sSim,persp);} else { for (const omv of opp){ let sReply=applyMove(sSim, omv); while (sReply.awaitingUpgrade){ const c2=aiPickMove(sReply); if (!c2||c2.kind!=='upgrade') break; sReply=applyUpgradeChoice(sReply,c2.choice);} const sc=evalState(sReply,persp); if (sc<worst) worst=sc; } } const final=worst + (mv.capture?80:0); if (final>bestScore){ bestScore=final; best=mv; } } return best; }
 
     function App(){
@@ -285,7 +290,7 @@
       return (
         <div className="w-full h-full flex flex-col items-center">
           <div className="w-full max-w-5xl px-4 pt-6 pb-3 flex items-center justify-between">
-            <div className="text-xl font-extrabold tracking-tight neon">TurboChess v0.4.1 — Spring Pulse + I Ching Heatmap</div>
+            <div className="text-xl font-extrabold tracking-tight neon">TurboChess v0.4.2 — Mid-Strip Rebalance + Multi-King End</div>
             <div className="flex items-center gap-2">
               <select className="px-2 py-1 rounded-md glass" value={mode} onChange={e=>reset(e.target.value)}>
                 <option value="human-ai">Human (White) vs AI</option>
@@ -341,7 +346,7 @@
             <div className="modalOverlay">
               <div className="modal glass">
                 <div className="text-lg font-bold mb-2">Choose Upgrade</div>
-                <div className="text-xs mb-2 opacity-80">Eligible choices depend on pawn ticks and position (mid-strip faster queen; 9 ticks unlocks King anywhere).</div>
+                <div className="text-xs mb-2 opacity-80">Eligible choices depend on pawn ticks and position (mid-strip N/B/R at 3; Queen at 5; 9 ticks unlocks King anywhere).</div>
                 <div className="flex flex-wrap gap-2 mb-3">
                   {state.awaitingUpgrade.choices.map(ch => (
                     <button key={ch} onClick={()=>onPick(ch)} className="pickerBtn glass hover:bg-white/10 px-3">
@@ -358,15 +363,16 @@
           )}
 
           <div className="w-full max-w-5xl px-4 py-4 text-sm opacity-80 space-y-2">
-            <p>Pawns gain +1 tick at end of their side's turns (except the pawn that moved, which resets). Mid-strip pawns with 3 ticks can become a Queen. Off-strip: 6 ticks → N/B/R; 9 ticks → Q or K. King capture ends the game.</p>
+            <p>Pawns gain +1 tick at end of their side's turns (except the pawn that moved, which resets). Mid-strip pawns now get N/B/R at 3 ticks and Queen at 5 ticks. Off-strip: 6 ticks → N/B/R; 8 ticks → Queen. 9 ticks → King anywhere.</p>
             <p>Spring (global seasons) begins after 5 full moves and lasts 8; at the start of your turn, each of your queens orthogonally adjacent to your king spawns 1 pawn on its file at the home pawn rank if empty.</p>
             <p>I Ching heatmap: any action on a square (move from/to, capture, EP cap square, upgrades, spring spawns) raises its heat by +1 (max 3). Each full move without action on that square reduces heat by 1. When heat hits 3, the square casts (gold pulse). Mechanics will hook into this later.</p>
+            <p>Game end: the game only ends when one side has no kings remaining (multi-king support).</p>
           </div>
         </div>
       );
     }
 
-    function PawnHUD({p}){ const t=p.tick||0; const onStrip=isMidStripSq(p.sq); const minor=onStrip?3:6; const qThr=onStrip?3:8; return (<div className="hud">T:{t} / NBR:{minor} Q:{qThr} K:9</div>); }
+    function PawnHUD({p}){ const t=p.tick||0; const onStrip=isMidStripSq(p.sq); const minor=onStrip?3:6; const qThr=onStrip?5:8; return (<div className="hud">T:{t} / NBR:{minor} Q:{qThr} K:9</div>); }
 
     function Piece({p}){
       const glyph = p.t==='K'?'♔': p.t==='Q'?'♕': p.t==='R'?'♖': p.t==='B'?'♗': p.t==='N'?'♘': '♙';
