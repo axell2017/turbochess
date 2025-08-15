@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TurboChess v0.2 Prototype</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@17/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    :root { --bg:#0a0f1a; --fg:#cfe8ff; --cyan:#48e1ff; --mag:#ff5ad6; --gold:#ffde6b; --green:#5bff95; --amber:#ffb35c; --blue:#77b5ff; }
+    html, body, #root { height: 100%; margin: 0; background: radial-gradient(1200px 800px at 50% 10%, #0e1630, #070b14 70%, #05060a); color: var(--fg); font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji"; }
+
+    /* Holographic board look */
+    .glass { backdrop-filter: blur(6px) saturate(120%); background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.02)); border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 10px 40px rgba(0,0,0,0.5), inset 0 0 60px rgba(255,255,255,0.04); }
+    .neon { text-shadow: 0 0 10px rgba(72,225,255,0.7); }
+    .midlineGlow { box-shadow: inset 0 0 25px rgba(72,225,255,0.5); }
+
+    /* Board grid */
+    .board { position: relative; display: grid; grid-template-columns: repeat(8, 1fr); grid-template-rows: repeat(8, 1fr); aspect-ratio: 1/1; }
+    .cell { position: relative; display:flex; align-items:center; justify-content:center; font-weight:600; }
+    .light { background: rgba(255,255,255,0.06); }
+    .dark { background: rgba(0,0,0,0.25); }
+    .sqLabel { position:absolute; left:6px; bottom:4px; opacity:0.35; font-size:10px; }
+
+    /* R:C HUD pills */
+    .hud { position:absolute; top:6px; right:6px; font-size:10px; padding:2px 6px; border-radius:999px; background: rgba(10, 180, 255, 0.12); border:1px solid rgba(72,225,255,0.45); color:#bfefff; text-shadow:0 0 8px rgba(72,225,255,0.6); }
+
+    /* Pieces (simple glyphs) */
+    .piece { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; font-size:28px; filter: drop-shadow(0 6px 18px rgba(0,0,0,0.6)); }
+    .w { color:#e6f6ff; text-shadow:0 0 6px rgba(72,225,255,0.7); }
+    .b { color:#ffd6f3; text-shadow:0 0 6px rgba(255,90,214,0.7); }
+
+    /* Selection/move highlighting */
+    .sel { outline: 2px solid rgba(72,225,255,0.9); box-shadow: inset 0 0 20px rgba(72,225,255,0.55); }
+    .moveDot { width:14px; height:14px; border-radius:999px; background: radial-gradient(circle at 30% 30%, rgba(72,225,255,0.9), rgba(72,225,255,0.1)); box-shadow:0 0 14px rgba(72,225,255,0.8); }
+
+    /* Upgrade flash */
+    @keyframes morphFlash { 0% { opacity:0; transform:scale(0.8);} 40%{opacity:1; transform:scale(1.15);} 100% { opacity:0; transform:scale(1);} }
+    .flash { pointer-events:none; position:absolute; inset:8px; border-radius:8px; background: radial-gradient(circle, rgba(72,225,255,0.6), rgba(255,255,255,0.05) 60%, rgba(0,0,0,0) 70%); animation: morphFlash 450ms ease-out; }
+
+    /* Center orbit rings (C:1..3) */
+    .ring { position:absolute; width:70%; height:70%; border-radius:999px; border:1px dashed rgba(72,225,255,0.5); animation: spin 6s linear infinite; }
+    .ring.r2 { width:56%; height:56%; animation-duration:4.5s; }
+    .ring.r3 { width:42%; height:42%; animation-duration:3s; }
+    @keyframes spin { from{transform:rotate(0deg);} to{transform:rotate(360deg);} }
+
+    /* Rest halo pips (R:1..6) */
+    .pips { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; }
+    .pip { width:6px; height:6px; margin:2px; border-radius:999px; background: rgba(72,225,255,0.7); box-shadow:0 0 10px rgba(72,225,255,0.8); opacity:0.6; }
+
+    /* Seasons overlay */
+    .seasons { pointer-events:none; position:absolute; inset:0; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; mix-blend-mode:screen; }
+    .season { opacity:0.16; }
+    .spring { background: radial-gradient(60% 60% at 30% 30%, rgba(91,255,149,0.4), rgba(0,0,0,0)); }
+    .summer { background: radial-gradient(60% 60% at 70% 30%, rgba(255,222,107,0.4), rgba(0,0,0,0)); }
+    .autumn { background: radial-gradient(60% 60% at 30% 70%, rgba(255,179,92,0.4), rgba(0,0,0,0)); }
+    .winter { background: radial-gradient(60% 60% at 70% 70%, rgba(119,181,255,0.4), rgba(0,0,0,0)); }
+
+    /* Hexagram hint layer */
+    .hexLayer { position:absolute; inset:0; display:grid; grid-template-columns:repeat(8, 1fr); grid-template-rows:repeat(8, 1fr); pointer-events:none; }
+    .hexCell { display:flex; align-items:center; justify-content:center; opacity:0.12; font-size:10px; }
+
+    a, button { outline:none; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <script type="text/babel">
+    // TurboChess v0.2 core (minimal playable + timers + upgrades)
+
+    const FILES = ['a','b','c','d','e','f','g','h'];
+    const RANKS = ['8','7','6','5','4','3','2','1'];
+    const IDX = (f,r) => r*8+f; // 0..63
+
+    const initialPieces = () => {
+      const pieces = [];
+      // Pawns
+      for (let f=0; f<8; f++) {
+        pieces.push({ t:'P', c:'w', sq: IDX(f,6), rest:0, center:0, id:`wP${f}` , hasMoved:false});
+        pieces.push({ t:'P', c:'b', sq: IDX(f,1), rest:0, center:0, id:`bP${f}` , hasMoved:false});
+      }
+      // Back ranks
+      const back = ['R','N','B','Q','K','B','N','R'];
+      for (let f=0; f<8; f++) {
+        pieces.push({ t:back[f], c:'w', sq: IDX(f,7) });
+        pieces.push({ t:back[f], c:'b', sq: IDX(f,0) });
+      }
+      return pieces;
+    };
+
+    function cloneState(s){ return JSON.parse(JSON.stringify(s)); }
+
+    function sqToFR(sq){ return [sq%8, Math.floor(sq/8)]; }
+    function FRToSq(f,r){ return r*8+f; }
+    function sqName(sq){ const [f,r]=sqToFR(sq); return FILES[f]+RANKS[7-r]; }
+
+    function boundaryRank(color){ return color==='w' ? 4 : 3; /* 0-indexed rows: white boundary is r=4 (rank 4), black boundary r=3 (rank 5) */ }
+    function onBoundary(piece){ const [,r]=sqToFR(piece.sq); return r===boundaryRank(piece.c); }
+    function beyondBoundary(color, r){ return color==='w' ? r < boundaryRank(color) : r > boundaryRank(color); }
+
+    function makeInitialState(){
+      return {
+        pieces: initialPieces(),
+        stm: 'w',
+        ep: null, // en passant target square index
+        ply: 0,
+        morphFlashSq: null,
+      };
+    }
+
+    function pieceAt(state, sq){ return state.pieces.find(p=>p.sq===sq); }
+    function inBoard(f,r){ return f>=0 && f<8 && r>=0 && r<8; }
+
+    function isEmpty(state, sq){ return !pieceAt(state, sq); }
+
+    function generateMoves(state){
+      // Pseudo-legal moves inc. waits. No full check legality for v0.2.
+      const moves = [];
+      const dir = { w: -1, b: 1 };
+      const their = state.stm==='w' ? 'b' : 'w';
+      const boundaryRow = boundaryRank(state.stm);
+
+      for (const p of state.pieces) {
+        if (p.c !== state.stm) continue;
+        if (p.t === 'P') {
+          const [f,r] = sqToFR(p.sq);
+
+          // WAIT action (always available; counters handled on apply)
+          moves.push({ kind:'wait', from:p.sq, pieceId:p.id });
+
+          // Forward 1 if not beyond boundary and empty
+          const r1 = r + dir[p.c];
+          if (inBoard(f,r1) && !beyondBoundary(p.c, r1) && isEmpty(state, FRToSq(f,r1))) {
+            moves.push({ kind:'move', from:p.sq, to: FRToSq(f,r1) });
+
+            // Double on first move to boundary if clear
+            if (!p.hasMoved) {
+              const r2 = r + 2*dir[p.c];
+              if (inBoard(f,r2) && r2===boundaryRank(p.c) && isEmpty(state, FRToSq(f,r2)) && isEmpty(state, FRToSq(f,r1))) {
+                moves.push({ kind:'move', from:p.sq, to: FRToSq(f,r2), double:true });
+              }
+            }
+          }
+
+          // Diagonal captures within/onto boundary only
+          for (const df of [-1, +1]){
+            const f2 = f+df, r2 = r + dir[p.c];
+            if (!inBoard(f2,r2) || beyondBoundary(p.c, r2)) continue;
+            const sq = FRToSq(f2,r2);
+            const victim = pieceAt(state, sq);
+            if (victim && victim.c !== p.c) {
+              moves.push({ kind:'move', from:p.sq, to:sq, capture:true });
+            }
+          }
+
+          // En passant gating by landing square not beyond boundary
+          if (state.ep != null) {
+            // ep square is the capture landing square
+            const [ef, er] = sqToFR(state.ep);
+            if (er === r + dir[p.c] && Math.abs(ef - f) === 1 && !beyondBoundary(p.c, er)){
+              // Ensure adjacent enemy pawn moved double last turn lands adjacent
+              const adjSq = FRToSq(ef, r);
+              const adj = pieceAt(state, adjSq);
+              if (adj && adj.t==='P' && adj.c!==p.c) {
+                moves.push({ kind:'move', from:p.sq, to: state.ep, capture:true, enPassant:true, capSq: adjSq });
+              }
+            }
+          }
+
+        } else if (p.t === 'N') {
+          const [f,r]=sqToFR(p.sq);
+          const deltas=[[1,2],[2,1],[2,-1],[1,-2],[-1,-2],[-2,-1],[-2,1],[-1,2]];
+          for (const [df,dr] of deltas){
+            const f2=f+df, r2=r+dr; if (!inBoard(f2,r2)) continue; const sq=FRToSq(f2,r2);
+            const q=pieceAt(state,sq); if (q && q.c===p.c) continue; moves.push({kind:'move', from:p.sq, to:sq, capture: !!q});
+          }
+        } else if (p.t === 'B' || p.t === 'R' || p.t === 'Q') {
+          const [f,r]=sqToFR(p.sq);
+          const rays = [];
+          if (p.t!=='B'){ rays.push([1,0],[-1,0],[0,1],[0,-1]); }
+          if (p.t!=='R'){ rays.push([1,1],[1,-1],[-1,1],[-1,-1]); }
+          for (const [df,dr] of rays){
+            let f2=f+df, r2=r+dr;
+            while (inBoard(f2,r2)){
+              const sq=FRToSq(f2,r2); const q=pieceAt(state,sq);
+              if (!q){ moves.push({kind:'move', from:p.sq, to:sq}); }
+              else { if (q.c!==p.c) moves.push({kind:'move', from:p.sq, to:sq, capture:true}); break; }
+              f2+=df; r2+=dr;
+            }
+          }
+        } else if (p.t === 'K') {
+          const [f,r]=sqToFR(p.sq);
+          for (let df=-1; df<=1; df++) for (let dr=-1; dr<=1; dr++){
+            if (df===0 && dr===0) continue; const f2=f+df, r2=r+dr; if (!inBoard(f2,r2)) continue; const sq=FRToSq(f2,r2); const q=pieceAt(state,sq); if (q && q.c===p.c) continue; moves.push({kind:'move', from:p.sq, to:sq, capture:!!q});
+          }
+          // No castling logic in v0.2 to keep it simple
+        }
+      }
+      return moves;
+    }
+
+    function applyMove(state, mv){
+      const s = cloneState(state);
+      const their = s.stm==='w' ? 'b' : 'w';
+      s.morphFlashSq = null;
+
+      // Increment wait counters if mv.kind==='wait', else handle resets
+      if (mv.kind === 'wait'){
+        // Find the pawn and increment the appropriate clock
+        const p = s.pieces.find(x=>x.id===mv.pieceId);
+        if (p && p.t==='P'){
+          if (onBoundary(p)) { p.center = Math.min(3, (p.center||0) + 1); }
+          else { p.rest = Math.min(6, (p.rest||0) + 1); }
+        }
+      } else if (mv.kind === 'move'){
+        // Move piece, handle capture and en passant
+        const mover = s.pieces.find(x=>x.sq===mv.from);
+        if (!mover) return state;
+        // Captures
+        if (mv.capture){
+          if (mv.enPassant){
+            // remove adjacent pawn at capSq
+            s.pieces = s.pieces.filter(x=>x.sq!==mv.capSq);
+          } else {
+            s.pieces = s.pieces.filter(x=>x.sq!==mv.to);
+          }
+        }
+        mover.sq = mv.to;
+        if (mover.t==='P'){
+          mover.hasMoved = true;
+          // reset rest
+          mover.rest = 0;
+          // center resets unless ending on boundary
+          if (onBoundary(mover)){
+            // Keep center as-is when landing on boundary? Per spec: leaving boundary or capturing resets center; ending on boundary keeps progress.
+            // If we moved from off-boundary to boundary, center remains whatever it was (likely 0). No increment on move.
+          } else {
+            mover.center = 0;
+          }
+        }
+        // Set en passant target if a pawn moved double
+        if (mover.t==='P' && mv.double){
+          const [f, rFrom] = sqToFR(mv.from);
+          const [_, rTo] = sqToFR(mv.to);
+          const midR = (rFrom + rTo)/2; // integer
+          s.ep = FRToSq(f, midR);
+        } else {
+          s.ep = null;
+        }
+      }
+
+      // After move/wait, switch side
+      s.stm = s.stm==='w' ? 'b' : 'w';
+      s.ply += 1;
+
+      // Start-of-turn metamorphosis for new side to move
+      const upState = resolveUpgrades(s);
+      upState.morphFlashSq = s.morphFlashSq; // carry through
+      return upState;
+    }
+
+    function resolveUpgrades(state){
+      const s = cloneState(state);
+      // Find pawns of side to move that qualify (center=3 on boundary OR rest=6 anywhere)
+      const upgrades = s.pieces.filter(p=> p.t==='P' && p.c===s.stm && ((onBoundary(p) && p.center===3) || p.rest===6));
+      if (upgrades.length===0) return s;
+
+      // For simplicity in v0.2, auto-upgrade to Queen; UI will let user pick.
+      for (const p of upgrades){
+        // Transform in place
+        p.t = 'Q';
+        delete p.id; delete p.hasMoved; delete p.center; delete p.rest;
+        s.morphFlashSq = p.sq;
+      }
+      return s;
+    }
+
+    // Simple evaluation + AI (depth-1 greedy)
+    function evalState(state){
+      const vals = {Q:900,R:500,B:330,N:320,P:100};
+      let score = 0; // from stm perspective
+      for (const p of state.pieces){
+        if (p.t!=='K') score += (p.c===state.stm?1:-1) * (vals[p.t]||0);
+        if (p.t==='P'){
+          if (onBoundary(p)) score += (p.c===state.stm?1:-1)*40;
+          if (p.center>=1) score += (p.c===state.stm?1:-1) * [0,120,250,450][p.center];
+          if (p.rest>=3) score += (p.c===state.stm?1:-1) * [0,0,0,70,120,220,400][p.rest];
+        }
+      }
+      // Small mobility proxy: count moves for stm minus opp
+      const stmMoves = generateMoves(state).length;
+      const s2 = cloneState(state); s2.stm = s2.stm==='w'?'b':'w';
+      const oppMoves = generateMoves(s2).length;
+      score += (stmMoves - oppMoves) * 1.5;
+      return score;
+    }
+
+    function aiPickMove(state){
+      // Resolve any start-of-turn upgrades automatically first (already done in state provided to AI)
+      const moves = generateMoves(state);
+      if (moves.length===0) return null;
+      let best= null, bestScore = -1e9;
+      for (const mv of moves){
+        const s2 = applyMove(state, mv);
+        const sc = evalState(s2) + Math.random()*1e-3;
+        if (sc>bestScore){ bestScore=sc; best=mv; }
+      }
+      return best;
+    }
+
+    // UI
+    function useQuery(){
+      const params = new URLSearchParams(window.location.search);
+      return {
+        mode: params.get('mode')||'human-ai', // 'human-human' | 'human-ai' | 'ai-ai'
+        speed: params.get('speed')||'normal', // 'normal' | 'fast' | 'instant'
+        hud: (params.get('hud')||'on')==='on'
+      };
+    }
+
+    function App(){
+      const query = useQuery();
+      const [state, setState] = React.useState(()=>{
+        const s = makeInitialState();
+        // Start-of-game: resolve white start upgrades (none) and return
+        return resolveUpgrades(s);
+      });
+      const [selected, setSelected] = React.useState(null);
+      const [moves, setMoves] = React.useState([]);
+      const [flashSq, setFlashSq] = React.useState(null);
+      const [running, setRunning] = React.useState(query.mode==='ai-ai');
+
+      const sideToHuman = React.useMemo(()=>{
+        if (query.mode==='human-human') return {w:true, b:true};
+        if (query.mode==='human-ai') return {w:true, b:false};
+        if (query.mode==='ai-human') return {w:false, b:true};
+        if (query.mode==='ai-ai') return {w:false, b:false};
+        return {w:true, b:false};
+      }, [query.mode]);
+
+      const speedMs = query.speed==='instant' ? 0 : (query.speed==='fast' ? 250 : 600);
+
+      // AI loop
+      React.useEffect(()=>{
+        if (!running) return;
+        if (sideToHuman[state.stm]) return; // wait for human
+        const id = setTimeout(()=>{
+          const mv = aiPickMove(state);
+          if (!mv){ setRunning(false); return; }
+          const s2 = applyMove(state, mv);
+          if (s2.morphFlashSq!=null){ setFlashSq(s2.morphFlashSq); setTimeout(()=>setFlashSq(null), 480); }
+          setState(s2);
+        }, speedMs);
+        return ()=>clearTimeout(id);
+      }, [running, state, sideToHuman, speedMs]);
+
+      function onCellClick(sq){
+        if (!sideToHuman[state.stm]) return;
+        const p = pieceAt(state, sq);
+        if (selected==null){
+          if (p && p.c===state.stm){
+            setSelected(sq);
+            // Show moves from this square + wait if pawn
+            const ms = generateMoves(state).filter(m=>m.from===sq || (m.kind==='wait' && p.t==='P'));
+            setMoves(ms);
+          }
+          return;
+        }
+        // If clicking same square and pawn, interpret as wait
+        if (selected===sq){
+          const pi = pieceAt(state, sq);
+          if (pi && pi.t==='P'){
+            const mv = {kind:'wait', from:sq, pieceId: pi.id};
+            const s2 = applyMove(state, mv);
+            if (s2.morphFlashSq!=null){ setFlashSq(s2.morphFlashSq); setTimeout(()=>setFlashSq(null), 480); }
+            setState(s2); setSelected(null); setMoves([]);
+            return;
+          }
+        }
+        // Try to find a move to this square
+        const cand = moves.find(m=>m.to===sq || m.kind==='wait');
+        if (cand){
+          const s2 = applyMove(state, cand);
+          if (s2.morphFlashSq!=null){ setFlashSq(s2.morphFlashSq); setTimeout(()=>setFlashSq(null), 480); }
+          setState(s2); setSelected(null); setMoves([]);
+        } else {
+          // reselect
+          setSelected(null); setMoves([]);
+          const p2 = pieceAt(state, sq);
+          if (p2 && p2.c===state.stm){
+            setSelected(sq);
+            const ms = generateMoves(state).filter(m=>m.from===sq || (m.kind==='wait' && p2.t==='P'));
+            setMoves(ms);
+          }
+        }
+      }
+
+      function reset(){ setState(resolveUpgrades(makeInitialState())); setSelected(null); setMoves([]); setRunning(query.mode==='ai-ai'); }
+
+      const [boardW, setBoardW] = React.useState(600);
+      React.useEffect(()=>{
+        function onResize(){
+          const w = Math.min(window.innerWidth, 900) - 32;
+          setBoardW(Math.max(280, w));
+        }
+        onResize();
+        window.addEventListener('resize', onResize);
+        return ()=>window.removeEventListener('resize', onResize);
+      }, []);
+
+      const grid = [];
+      for (let r=0; r<8; r++){
+        for (let f=0; f<8; f++){
+          const sq = FRToSq(f,r);
+          grid.push(sq);
+        }
+      }
+
+      const seasonOn = true; // toggle later via query
+
+      return (
+        <div className="w-full h-full flex flex-col items-center">
+          <div className="w-full max-w-5xl px-4 pt-6 pb-3 flex items-center justify-between">
+            <div className="text-xl font-extrabold tracking-tight neon">TurboChess v0.2</div>
+            <div className="flex items-center gap-2">
+              <button className="px-3 py-1 rounded-md glass hover:bg-white/10" onClick={()=>setRunning(r=>!r)}>{running? 'Pause' : 'Play'}</button>
+              <button className="px-3 py-1 rounded-md glass hover:bg-white/10" onClick={reset}>Reset</button>
+            </div>
+          </div>
+
+          <div className="relative" style={{width: boardW, aspectRatio:'1/1'}}>
+            <div className="board glass rounded-lg overflow-hidden" style={{width: '100%', height: '100%'}}>
+              {grid.map((sq)=>{
+                const [f,r]=sqToFR(sq);
+                const isLight = (f+r)%2===0;
+                const p = pieceAt(state, sq);
+                const midline = (r===3 || r===4);
+                const isSel = selected===sq;
+                const ms = moves.filter(m=>m.to===sq && m.kind==='move');
+                return (
+                  <div key={sq} className={`cell ${isLight? 'light':'dark'} ${midline? 'midlineGlow' : ''} ${isSel? 'sel':''}`} onClick={()=>onCellClick(sq)}>
+                    <div className="sqLabel">{FILES[f]}{RANKS[7-r]}</div>
+                    {p && <Piece p={p} />}
+                    {query.hud && p && p.t==='P' && <PawnHUD p={p} />}
+                    {ms.length>0 && <div className="moveDot" />}
+                    {flashSq===sq && <div className="flash" />}
+                  </div>
+                );
+              })}
+
+              {seasonOn && <div className="seasons">
+                <div className="season spring"></div>
+                <div className="season summer"></div>
+                <div className="season autumn"></div>
+                <div className="season winter"></div>
+              </div>}
+
+              <HexLayer />
+            </div>
+          </div>
+
+          <div className="w-full max-w-5xl px-4 py-4 text-sm opacity-80">
+            <p>
+              Tips: Click a pawn to select; click it again to "Wait" (increments Rest anywhere or Center on the midline). Pawns can't move or capture beyond their boundary (white rank 4, black rank 5). Upgrades trigger at the start of your turn after Center=3 or Rest=6, and the new piece moves immediately that turn. En passant only if the landing square isn't beyond your boundary.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    function PawnHUD({p}){
+      const c = onBoundary(p) ? (p.center||0) : 0;
+      const r = (p.rest||0);
+      return (
+        <div className="hud">
+          R:{r} / C:{c}
+        </div>
+      );
+    }
+
+    function Piece({p}){
+      const glyph = (()=>{
+        switch(p.t){
+          case 'K': return '♔';
+          case 'Q': return '♕';
+          case 'R': return '♖';
+          case 'B': return '♗';
+          case 'N': return '♘';
+          case 'P': return '♙';
+          default: return '?';
+        }
+      })();
+      const cls = p.c==='w' ? 'w' : 'b';
+      return (
+        <div className={`piece ${cls}`}>
+          <span>{glyph}</span>
+          {/* Center orbit rings */}
+          {p.t==='P' && onBoundary(p) && p.center>0 && (
+            <>
+              <div className="ring r1"></div>
+              {p.center>=2 && <div className="ring r2"></div>}
+              {p.center>=3 && <div className="ring r3"></div>}
+            </>
+          )}
+          {/* Rest halo pips */}
+          {p.t==='P' && !onBoundary(p) && p.rest>0 && (
+            <div className="pips">
+              {[...Array(Math.min(6, p.rest)).keys()].map(i=> <div key={i} className="pip" />)}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    function HexLayer(){
+      const cells = [];
+      for (let i=0;i<64;i++) cells.push(i);
+      const glyphs = ['䷀','䷁','䷂','䷃','䷄','䷅','䷆','䷇','䷈','䷉','䷊','䷋','䷌','䷍','䷎','䷏'];
+      return (
+        <div className="hexLayer">
+          {cells.map((i)=>{
+            return <div key={i} className="hexCell">{glyphs[i%glyphs.length]}</div>;
+          })}
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
